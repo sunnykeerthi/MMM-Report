@@ -1,0 +1,328 @@
+Module.register("qmReport", {
+	// Default module config.
+	defaults: {
+		width: 400,
+		height: 400,
+		text: "Hello World!",
+		slideIndex: -1,
+		rotateInterval: 30 * 1000,
+		animationSpeed: 3000, // fade in and out speed
+		initialLoadDelay: 4250,
+		retryDelay: 2500,
+		updateInterval: 60 * 60 * 1000,
+	},
+	total_info: "Hello World!",
+	getScripts: function () {
+		return [
+			'jsforce.js',
+			'moment.js',
+			"modules/MMM-Chart/node_modules/chart.js/dist/Chart.bundle.min.js"
+		]
+	},
+
+	getStyles: function () {
+		return [
+			'qmReportStyles.css'
+		]
+	},
+
+	getRandomColor: function () {
+		var letters = '0123456789ABCDEF';
+		var color = '#';
+		for (var i = 0; i < 6; i++) {
+			color += letters[Math.floor(Math.random() * 16)];
+		}
+		return color;
+	},
+
+	// Override dom generator.
+	getDom: function () {
+		console.log('get dom');
+		var wrapperEl = document.createElement("div");
+		var slideshow_container = document.createElement("div");
+		slideshow_container.className = "slideshow-container";
+		wrapperEl.appendChild(slideshow_container);
+
+		if (this.total_info != 'Hello World!') {
+			console.log('JSON.stringify(this.total_info)');
+			console.log(JSON.stringify(this.total_info));
+			console.log('JSON.stringify(this.total_info)');
+
+
+			var currentReport = this.total_info.records[0];
+
+			var returnedDataForTasks = this.total_info.records.reduce(function (keys, element) {
+				console.log(keys);
+				console.log(element);
+				console.log(Object.keys(element));
+
+				for (key in element) {
+					console.log('inside');
+					console.log(key)
+					if (key.includes('hrs')) {
+						keys.workloadRegion[key] = element[key];
+
+					} else if (key.includes('usd')) {
+						keys.pipeLineInfluencedRegion[key] = element[key];
+
+
+					} else if (key.includes('__c')) {
+						keys.assistInQueueRegion[key] = element[key];
+					}
+
+				}
+				return keys;
+			}, { workloadRegion: {}, pipeLineInfluencedRegion: {}, assistInQueueRegion: {} });
+			console.log('Keys are ' + JSON.stringify(returnedDataForTasks.pipeLineInfluencedRegion));
+			console.log('Keys are ' + JSON.stringify(returnedDataForTasks.workloadRegion));
+			console.log('Keys are ' + JSON.stringify(returnedDataForTasks.assistInQueueRegion));
+			wrapperEl.id = "myChartForWorkloads";
+			wrapperEl.setAttribute("style", "position: relative; background:white");
+
+
+			/*Pipeline Influence Data Start*/
+			var regionPipelineKeys = returnedDataForTasks.pipeLineInfluencedRegion;
+
+			var regionPipelineData = {};
+			var labels = [];
+			var datasets = [];
+			var nextKey = "";
+			var i = 0;
+			for (var newKey in regionPipelineKeys) {
+				var label = [];
+				var data = [0, 0, 0];
+				var indOutput = {};
+				var currKey = newKey;
+				var spaceCount = (currKey.split("_").length - 1);
+				console.log(currKey + "\t" + nextKey);
+				if (nextKey.length > 0) {
+					if (spaceCount > 3) {
+						if (!(currKey.split('_')[0] == nextKey.split('_')[0])) {
+							labels.push(currKey.split('_')[0]);
+						}
+
+						data[i] = parseFloat(regionPipelineKeys[currKey]);
+						label.push((currKey.split('_')[1]).split('_')[0]);
+						if ((currKey.split('_')[0] == nextKey.split('_')[0])) {
+							i++;
+						}
+					} else {
+						labels.push(currKey.split('_')[0]);
+						data[i] = parseFloat(regionPipelineKeys[currKey]);
+						label.push(currKey.split('_')[0]);
+						i++;
+					}
+				} else {
+					labels.push(currKey.split('_')[0]);
+					data[i] = parseFloat(regionPipelineKeys[currKey]);
+					label.push((currKey.split('_')[1]).split('_')[0]);
+
+				}
+				nextKey = currKey;
+				indOutput["label"] = label;
+				indOutput["data"] = data;
+				indOutput["backgroundColor"] = this.getRandomColor();
+
+
+				datasets.push(indOutput);
+			}
+			regionPipelineData["labels"] = labels;
+			regionPipelineData["datasets"] = datasets;
+
+
+			chartConfigPipelineInfluences = {
+				type: 'horizontalBar',
+				data: regionPipelineData,
+				options: {
+					responsive: true,
+					scales: {
+						xAxes: [{
+							scaleLabel: {
+								display: true,
+								labelString: 'Pipeline Influenced ($MN)'
+							},
+							stacked: true,
+						}],
+						yAxes: [{
+							scaleLabel: {
+								display: true,
+								labelString: 'Region'
+							},
+							stacked: true,
+
+						}]
+					}
+				}
+			}
+
+
+
+			// Create chart canvas
+			const chartElPipelineInfluence = document.createElement("canvas");
+			//chartElPipelineInfluence.style.display = "none"
+			chartElPipelineInfluence.className = "mySlides";
+			chartElPipelineInfluence.width = this.config.width;
+			chartElPipelineInfluence.height = this.config.height;
+			// chartEl.innerHTML = 'Hello world!';
+
+			slideshow_container.appendChild(chartElPipelineInfluence);
+
+
+
+			this.chart = new Chart(chartElPipelineInfluence.getContext("2d"), chartConfigPipelineInfluences);
+
+			// Append chart
+			slideshow_container.appendChild(chartElPipelineInfluence);
+			/*Pipeline Influence Data End*/
+
+			/*Workload by Region in Hours Start*/
+			var regionWorkloadKeys = returnedDataForTasks.workloadRegion;
+
+			var labels = Object.values(regionWorkloadKeys);
+			console.log("Region workload keys " + labels);
+
+
+			chartConfigWorkload = {
+				type: 'pie',
+				data: {
+					labels: Object.keys(regionWorkloadKeys),
+					datasets: [{
+						backgroundColor: ["#7ECFA2", "#866B42", "#77FF81", "#F127F8", "#9647BC", "#74CB15"],
+						data: Object.values(regionWorkloadKeys)
+					}]
+				},
+				options: {
+					cutoutPercentage: 80
+				}
+			}
+
+
+			console.log('^^^^^' + JSON.stringify(chartConfigWorkload));
+			//Create chart canvas
+			const chartElWorkload = document.createElement("canvas");
+			//chartElWorkload.style.display = "none";
+			chartElWorkload.className = "mySlides";
+			chartElWorkload.width = this.config.width;
+			chartElWorkload.height = this.config.height;
+			// chartEl.innerHTML = 'Hello world!';
+
+			slideshow_container.appendChild(chartElWorkload);
+
+
+
+			this.chart = new Chart(chartElWorkload.getContext("2d"), chartConfigWorkload);
+
+			// Append chart
+			slideshow_container.appendChild(chartElWorkload);
+			/*Workload by Region in Hours End*/
+
+			/*Assists In Queue Start*/
+
+			var regionassistInQueueRegionKeys = returnedDataForTasks.assistInQueueRegion;
+
+			var labels = Object.values(regionassistInQueueRegionKeys);
+			console.log("Region workload keys " + labels);
+
+
+			chartConfigAssists = {
+				type: 'bar',
+				data: {
+					labels: Object.keys(regionassistInQueueRegionKeys),
+					datasets: [{
+						backgroundColor: ["#7ECFA2", "#866B42", "#77FF81", "#F127F8", "#9647BC", "#74CB15"],
+						data: Object.values(regionassistInQueueRegionKeys)
+					}]
+				},
+				options: {
+					cutoutPercentage: 80
+				}
+			}
+
+
+			// Create chart canvas
+			const chartElAssists = document.createElement("canvas");
+			// chartElAssists.style.display = "none";
+			chartElAssists.className = "mySlides";
+			chartElAssists.width = this.config.width;
+			chartElAssists.height = this.config.height;
+			// chartEl.innerHTML = 'Hello world!';
+
+			slideshow_container.appendChild(chartElAssists);
+
+
+
+			this.chart = new Chart(chartElAssists.getContext("2d"), chartConfigAssists);
+
+			// Append chart
+			slideshow_container.appendChild(chartElAssists);
+			/*Assists In Queue End*/
+			console.log(slideshow_container);
+			////////////////////////////
+			// var slideIndex = 0;
+
+			// var i;
+			// this.startSlides(slideshow_container);
+			/*var slides = document.getElementsByClassName("slideshow-container");
+			console.log(slides);
+			console.log(slides.length);
+			for (i = 0; i < slides.length; i++) {
+				console.log(slides[i]);
+				slides[i].style.display = "none";
+			}
+			slideIndex++;
+			if (slideIndex > slides.length) { slideIndex = 1 }
+			console.log('Index:'+slideIndex);
+			// for (i = 0; i < dots.length; i++) {
+			// 	dots[i].className = dots[i].className.replace(" active", "");
+			// }
+			slides[slideIndex - 1].style.display = "block";
+			console.log('Here');
+			//dots[slideIndex - 1].className += " active";
+			//setTimeout(startSlides, 2000); // Change image every 2 seconds */
+
+			Log.log("slide payload >> ");
+
+		}
+		return wrapperEl;
+	},
+
+
+
+	showSlides: function () {
+		if (!this.slideIndex) {
+			this.slideIndex = 0;
+		}
+		var i;
+		var slides = document.getElementsByClassName("mySlides");
+		for (i = 0; i < slides.length; i++) {
+			console.log(slides[i]);
+			slides[i].style.display = "none";
+		}
+		console.log("slideIndex " + this.slideIndex + "\t sise is " + (slides.length - 1));
+		console.log(slides[0]);
+		this.slideIndex++;
+
+		slides[this.slideIndex - 1].style.display = "block";
+		if (this.slideIndex > (slides.length - 1)) { this.slideIndex = 0 }
+
+		setInterval(this.showSlides, 2000);
+	},
+
+	start: function () {
+		this.slideIndex = -1;
+		this.showSlides;
+		this.sendSocketNotification('qmReport_initConnection');
+	},
+
+
+
+
+
+
+	socketNotificationReceived: function (notification, payload) {
+		if (notification === "qmReport_updateNumbers") {
+			Log.log("payload >> " + payload);
+			setInterval(this.showSlides, 2000);
+		}
+	}
+});
